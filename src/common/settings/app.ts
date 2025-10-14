@@ -102,9 +102,9 @@ export enum Tab {
   PERCENTAGE_CHART = "percentageChart",
   MONITOR = "monitor",
   INVISIBLE = "invisible", // Deprecated
-  LLM_ANALYSIS = "LLMAnalysis",
+  QUESTION = "question",
 }
-
+//  LLM_ANALYSIS = "LLMAnalysis",
 export enum TextDecodingRule {
   STRICT = "strict",
   AUTO_DETECT = "autoDetect",

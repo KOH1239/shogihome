@@ -57,10 +57,12 @@
           class="full tab-content"
           :size="contentSize"
         />
-        <LLMAnalysis
-          v-if="activeTab === Tab.LLM_ANALYSIS"
+        <!-- 💬 質問入力欄 -->
+        <QuestionView
+          v-if="activeTab === Tab.QUESTION"
           class="full tab-content"
-          :current-sfen="record.sfen"
+          :size="contentSize"
+          @ask="onQuestionAsked"
         />
       </div>
     </div>
@@ -76,9 +78,9 @@ import { PropType, computed } from "vue";
 import RecordComment from "@/renderer/view/tab/RecordComment.vue";
 import EngineAnalytics from "@/renderer/view/tab/EngineAnalytics.vue";
 import EvaluationChart from "@/renderer/view/tab/EvaluationChart.vue";
-import LLMAnalysis from "@/renderer/view/tab/LLMAnalytics.vue";
 import RecordInfo from "@/renderer/view/tab/RecordInfo.vue";
 import MonitorView from "@/renderer/view/monitor/MonitorView.vue";
+import QuestionView from "@/renderer/view/tab/QuestionView.vue";
 import { RectSize } from "@/common/assets/geometry.js";
 import Icon from "@/renderer/view/primitive/Icon.vue";
 import { Tab } from "@/common/settings/app";
@@ -86,7 +88,6 @@ import { EvaluationChartType } from "@/common/settings/layout";
 import { IconType } from "@/renderer/assets/icons";
 import { t } from "@/common/i18n";
 import { useAppSettings } from "@/renderer/store/settings";
-import { useStore } from "@/renderer/store";
 
 const props = defineProps({
   size: {
@@ -112,13 +113,28 @@ const emit = defineEmits<{
   onMinimize: [];
 }>();
 
-const store = useStore();
-const record = store.record;
-
 const appSettings = useAppSettings();
 const changeSelect = (tab: Tab) => emit("onChangeTab", tab);
 const minimize = () => emit("onMinimize");
 const contentSize = computed(() => props.size.reduce(new RectSize(0, headerHeight)));
+
+const onQuestionAsked = async (q: string) => {
+  // ここで質問qを受け、実際にIPCやAPIへ送信する処理を書く
+  // 例：api.generateCommentFromLLM(currentSfen, q) のような呼び出し
+  try {
+    // loading表示をTabPane側でも管理したければ追加する
+    // eslint-disable-next-line no-console
+    console.log("質問を受け取りました:", q);
+
+    // 例（疑似コード）:
+    // const sfen = store.currentSfen; // もしstoreなどで局面を取れるなら
+    // const reply = await api.generateCommentFromLLM({ sfen, prompt: q });
+    // // reply を RecordComment タブや QuestionView に表示させる処理を行う
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("質問送信エラー:", err);
+  }
+};
 
 const tabs = {
   [Tab.RECORD_INFO]: {
@@ -141,6 +157,10 @@ const tabs = {
     title: t.evaluation,
     icon: IconType.CHART,
   },
+  [Tab.QUESTION]: {
+    title: "LLM解説文",
+    icon: IconType.BRAIN,
+  },
   [Tab.PERCENTAGE_CHART]: {
     title: t.estimatedWinRate,
     icon: IconType.PERCENT,
@@ -152,10 +172,6 @@ const tabs = {
   [Tab.INVISIBLE]: {
     title: t.hideTabView,
     icon: IconType.ARROW_DROP,
-  },
-  [Tab.LLM_ANALYSIS]: {
-    title: "LLM解説文",
-    icon: IconType.BRAIN,
   },
 };
 </script>
@@ -188,5 +204,39 @@ const tabs = {
 .tab-contents .tab-content {
   color: var(--text-color);
   background-color: var(--tab-content-bg-color);
+}
+
+/* 💬 質問入力欄のスタイル */
+.question-area {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px;
+  border-top: 1px solid var(--border-color);
+  background-color: var(--tab-content-bg-color);
+}
+
+.question-input {
+  flex: 1;
+  margin-right: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--main-color);
+  border-radius: 6px;
+  font-size: 90%;
+  background-color: var(--main-bg-color);
+  color: var(--main-color);
+}
+
+.ask-button {
+  padding: 6px 12px;
+  background-color: var(--main-color);
+  color: var(--main-bg-color);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ask-button:hover {
+  opacity: 0.8;
 }
 </style>

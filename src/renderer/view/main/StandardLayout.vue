@@ -53,7 +53,7 @@
             Tab.CHART,
             Tab.PERCENTAGE_CHART,
             Tab.MONITOR,
-            Tab.LLM_ANALYSIS,
+            Tab.QUESTION,
           ]"
           :active-tab="appSettings.tab"
           :display-minimize-toggle="true"
@@ -83,7 +83,7 @@
               v-if="appSettings.tabPaneType === TabPaneType.DOUBLE"
               class="full"
               :size="tabPaneSize2"
-              :visible-tabs="[Tab.COMMENT, Tab.CHART, Tab.PERCENTAGE_CHART]"
+              :visible-tabs="[Tab.COMMENT, Tab.CHART, Tab.PERCENTAGE_CHART, Tab.QUESTION]"
               :active-tab="appSettings.tab2"
               :display-minimize-toggle="true"
               @on-change-tab="onChangeTab2"

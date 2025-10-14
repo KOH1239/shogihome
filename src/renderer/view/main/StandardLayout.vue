@@ -53,6 +53,7 @@
             Tab.CHART,
             Tab.PERCENTAGE_CHART,
             Tab.MONITOR,
+            Tab.LLM_ANALYSIS,
           ]"
           :active-tab="appSettings.tab"
           :display-minimize-toggle="true"

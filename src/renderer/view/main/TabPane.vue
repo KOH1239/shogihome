@@ -57,6 +57,11 @@
           class="full tab-content"
           :size="contentSize"
         />
+        <LLMAnalysis
+          v-if="activeTab === Tab.LLM_ANALYSIS"
+          class="full tab-content"
+          :current-sfen="record.sfen"
+        />
       </div>
     </div>
   </div>
@@ -71,6 +76,7 @@ import { PropType, computed } from "vue";
 import RecordComment from "@/renderer/view/tab/RecordComment.vue";
 import EngineAnalytics from "@/renderer/view/tab/EngineAnalytics.vue";
 import EvaluationChart from "@/renderer/view/tab/EvaluationChart.vue";
+import LLMAnalysis from "@/renderer/view/tab/LLMAnalytics.vue";
 import RecordInfo from "@/renderer/view/tab/RecordInfo.vue";
 import MonitorView from "@/renderer/view/monitor/MonitorView.vue";
 import { RectSize } from "@/common/assets/geometry.js";
@@ -80,6 +86,7 @@ import { EvaluationChartType } from "@/common/settings/layout";
 import { IconType } from "@/renderer/assets/icons";
 import { t } from "@/common/i18n";
 import { useAppSettings } from "@/renderer/store/settings";
+import { useStore } from "@/renderer/store";
 
 const props = defineProps({
   size: {
@@ -104,6 +111,9 @@ const emit = defineEmits<{
   onChangeTab: [tab: Tab];
   onMinimize: [];
 }>();
+
+const store = useStore();
+const record = store.record;
 
 const appSettings = useAppSettings();
 const changeSelect = (tab: Tab) => emit("onChangeTab", tab);
@@ -142,6 +152,10 @@ const tabs = {
   [Tab.INVISIBLE]: {
     title: t.hideTabView,
     icon: IconType.ARROW_DROP,
+  },
+  [Tab.LLM_ANALYSIS]: {
+    title: "LLM解説文",
+    icon: IconType.BRAIN,
   },
 };
 </script>

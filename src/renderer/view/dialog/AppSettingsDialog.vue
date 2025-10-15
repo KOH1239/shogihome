@@ -642,6 +642,15 @@
             ]"
           />
         </div>
+        <!-- FastAPI explain endpoint -->
+        <div class="form-item">
+          <div class="form-item-label-wide">FastAPI URL</div>
+          <input v-model="update.fastapiUrl" type="text" class="long-text" />
+        </div>
+        <div class="form-item">
+          <div class="form-item-label-wide">FastAPI top_k</div>
+          <input v-model.number="update.fastapiTopK" type="number" min="1" max="20" />
+        </div>
       </div>
       <hr v-if="!isMobileWebApp()" />
       <!-- アプリバージョン -->
@@ -818,6 +827,9 @@ const update = ref({
   pieceVolume: org.pieceVolume,
   clockVolume: org.clockVolume,
   clockPitch: org.clockPitch,
+  // FastAPI / LLM explain
+  fastapiUrl: org.fastapiUrl,
+  fastapiTopK: org.fastapiTopK ?? 2,
   clockSoundTarget: org.clockSoundTarget,
   recordShortcutKeys: org.recordShortcutKeys,
   defaultRecordFileFormat: org.defaultRecordFileFormat,
@@ -860,6 +872,8 @@ function reverseFormat(source: AppSettingsUpdate): AppSettingsUpdate {
     pieceVolume: Math.max(0, Math.min(100, source.pieceVolume!)),
     clockVolume: Math.max(0, Math.min(100, source.clockVolume!)),
     clockPitch: Math.max(220, Math.min(880, source.clockPitch!)),
+    fastapiUrl: source.fastapiUrl,
+    fastapiTopK: source.fastapiTopK,
   };
 }
 
@@ -966,6 +980,9 @@ input.file-path {
 }
 .selector {
   max-width: 400px;
+}
+input.long-text {
+  width: 350px;
 }
 button.auxiliary {
   margin-left: 5px;

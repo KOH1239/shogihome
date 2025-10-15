@@ -88,6 +88,13 @@ function validateHTTPRequestURL(url: string) {
 }
 
 export function validateHTTPRequest(method: string, url: string) {
+  // In development mode we allow outgoing requests from the renderer
+  // (useful for local API backends, dev servers, etc.). In production
+  // we enforce stricter checks below.
+  if (isDevelopment()) {
+    return;
+  }
+
   validateHTTPRequestMethod(method);
   validateHTTPRequestURL(url);
 }

@@ -30,6 +30,27 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    // Development proxy to avoid CORS when calling local backend (e.g. FastAPI on :8081)
+    proxy: {
+      // Forward requests starting with /explain to the backend
+      "/explain": {
+        target: "http://localhost:8081",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/stream_explain": {
+        target: "http://localhost:8081",
+        changeOrigin: true,
+        secure: false,
+      },
+      // Optional: forward API namespace
+      "/api": {
+        target: "http://localhost:8081",
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+    },
   },
   test: {
     dir: "./src/tests",

@@ -287,6 +287,13 @@ class AppSettingsStore {
   get enableHardwareAcceleration(): boolean {
     return this.merged.enableHardwareAcceleration;
   }
+  // FastAPI / LLM explain endpoint
+  get fastapiUrl(): string | undefined {
+    return this.merged.fastapiUrl;
+  }
+  get fastapiTopK(): number | undefined {
+    return this.merged.fastapiTopK;
+  }
 
   async loadAppSettings(): Promise<void> {
     this.settings = await api.loadAppSettings();

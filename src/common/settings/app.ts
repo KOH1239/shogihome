@@ -264,6 +264,9 @@ export type AppSettings = {
 
   // Low Level
   enableHardwareAcceleration: boolean;
+  // FastAPI / LLM explain endpoint
+  fastapiUrl?: string;
+  fastapiTopK?: number;
 };
 
 export function isLogEnabled(type: LogType, appSettings: AppSettings): boolean {
@@ -399,6 +402,9 @@ export function defaultAppSettings(opt?: {
     lastOtherFilePath: "",
     emptyRecordInfoVisibility: true,
     enableHardwareAcceleration: true,
+    // Default explain backend and top_k
+    fastapiUrl: "/stream_explain",
+    fastapiTopK: 2,
   };
 }
 

@@ -101,7 +101,12 @@ export async function loadUSIEngines(): Promise<USIEngines> {
 const appSettingsPath = path.join(userDir, "app_setting.json");
 
 export async function saveAppSettings(settings: AppSettings): Promise<void> {
-  await writeFileAtomic(appSettingsPath, JSON.stringify(settings, undefined, 2), "utf8");
+  const normalized = normalizeAppSettings(settings, {
+    returnCode: defaultReturnCode,
+    autoSaveDirectory: docDir,
+  });
+  appSettingsCache = normalized;
+  await writeFileAtomic(appSettingsPath, JSON.stringify(normalized, undefined, 2), "utf8");
 }
 
 const defaultReturnCode = process.platform === "win32" ? "\r\n" : "\n";

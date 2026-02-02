@@ -13,10 +13,9 @@
 
     <div v-if="explanation || answer || loading" class="answer-box">
       <div class="answer-content">
-        <pre
-          class="explanation"
-          v-text="explanation || (answer ? answer : loading ? '送信中…' : '')"
-        ></pre>
+        <div v-if="answer" class="explanation" v-text="answer"></div>
+        <!-- eslint-disable-next-line vue/no-v-html -->
+        <div v-else class="explanation markdown" v-html="renderedExplanationHtml"></div>
 
         <div v-if="similarComments.length" class="similar-section">
           <h5 class="similar-title">類似局面のコメント（{{ similarComments.length }}）</h5>
@@ -36,7 +35,9 @@
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import MarkdownIt from "markdown-it";
 import { useStore } from "@/renderer/store";
+import { isNative } from "@/renderer/ipc/api";
 import { useAppSettings } from "@/renderer/store/settings";
 
 defineProps({
@@ -53,6 +54,27 @@ const similarComments = ref<string[]>([]);
 const showMore = ref(false);
 const loading = ref(false);
 
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+});
+
+// markdown-it already blocks javascript: etc by default, but keep it explicit.
+md.validateLink = (url: string) => {
+  try {
+    const u = new URL(url, "http://localhost");
+    return ["http:", "https:", "mailto:", "app:", "user-file:"].includes(u.protocol);
+  } catch {
+    return false;
+  }
+};
+
+const renderedExplanationHtml = computed(() => {
+  const text = loading.value ? "送信中…" : explanationRaw.value || explanation.value || "";
+  return md.render(text);
+});
+
 const handleSubmit = async () => {
   const q = question.value.trim();
   if (!q) return;
@@ -67,7 +89,28 @@ const handleSubmit = async () => {
     const store = useStore();
     const sfen = store.record?.position?.sfen ?? store.record?.sfen ?? "";
     const appSettings = useAppSettings();
-    const fastapiUrl = appSettings.fastapiUrl || "/stream_explain";
+    let fastapiUrl = appSettings.fastapiUrl || "/stream_explain";
+
+    // Browser dev mode: if user set absolute localhost URL, convert to a relative path
+    // so Vite proxy can avoid CORS.
+    if (
+      !isNative() &&
+      window.location.protocol === "http:" &&
+      fastapiUrl.startsWith("http://localhost:")
+    ) {
+      try {
+        const u = new URL(fastapiUrl);
+        fastapiUrl = u.pathname;
+      } catch {
+        // keep original
+      }
+    }
+
+    // Native (Electron) preview/production: relative paths like "/stream_explain" would resolve to
+    // app://bundle/... and be blocked. Default to localhost backend if only a path is provided.
+    if (isNative() && fastapiUrl.startsWith("/")) {
+      fastapiUrl = `http://localhost:8081${fastapiUrl}`;
+    }
     const topK = appSettings.fastapiTopK ?? 2;
     const resp = await fetch(fastapiUrl, {
       method: "POST",
@@ -81,7 +124,7 @@ const handleSubmit = async () => {
       const txt = await resp.text();
       if (resp.status === 405 || /予期せぬHTTPメソッド/.test(txt)) {
         const params = new URLSearchParams({ user_input: q, sfen });
-        const getResp = await fetch(`/explain?${params.toString()}`);
+        const getResp = await fetch(buildExplainURL(fastapiUrl, params));
         if (getResp.ok) {
           try {
             data = await getResp.json();
@@ -238,7 +281,16 @@ const handleSubmit = async () => {
       // keep any similarComments collected from metadata frames
     }
   } catch (err: unknown) {
-    answer.value = err && (err as Error).message ? (err as Error).message : "エラーが発生しました";
+    const msg = err && (err as Error).message ? (err as Error).message : "エラーが発生しました";
+    // Make common network failures less cryptic
+    if (/Failed to fetch/i.test(msg)) {
+      answer.value =
+        "通信に失敗しました。\n" +
+        "- Electron(プレビュー/本番)の場合: FastAPI側でCORS(OPTIONS)を許可するか、FastAPI URLを確認してください。\n" +
+        "- Web(serve)の場合: Viteプロキシ用に FastAPI URL を /stream_explain のような相対パスにしてください。";
+    } else {
+      answer.value = msg;
+    }
   } finally {
     loading.value = false;
     question.value = "";
@@ -271,6 +323,18 @@ function normalizeResponse(s: string) {
   }
   return out.join("\n");
 }
+
+function buildExplainURL(fastapiUrl: string, params: URLSearchParams) {
+  try {
+    const u = new URL(fastapiUrl);
+    const basePath = u.pathname.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || "/";
+    u.pathname = `${basePath === "/" ? "" : basePath}/explain`;
+    u.search = params.toString();
+    return u.toString();
+  } catch {
+    return `/explain?${params.toString()}`;
+  }
+}
 </script>
 
 <style scoped>
@@ -283,12 +347,13 @@ function normalizeResponse(s: string) {
   flex: 1 1 auto;
   min-height: 0; /* allow children to shrink inside flex container */
   box-sizing: border-box;
-  /* make the tab occupy the viewport so overflow can actually happen */
-  height: 35vh;
-  /* always show vertical scrollbar for the tab and make it scrollable */
-  overflow-y: scroll;
+  /* Fill the entire tab area */
+  height: 100%;
+  max-height: 100%;
+  /* the tab itself does not scroll; the output area scrolls */
+  overflow-y: hidden;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
+  background-color: var(--tab-content-bg-color);
 }
 .question-input-row {
   display: flex;
@@ -309,21 +374,42 @@ function normalizeResponse(s: string) {
   cursor: pointer;
 }
 .answer-box {
-  background-color: white !important; /* 背景を白にする */
-  color: black; /* 文字色も黒にすると見やすい */
-  padding: 10px; /* 内側に少し余白を入れる */
-  border-radius: 6px; /* 角を少し丸くする（お好み） */
-  border: 1px solid #ddd; /* 薄い枠線を追加（お好み） */
   margin-top: 8px;
-  padding: 8px;
-  background: var(--tab-content-bg-color);
+  padding: 12px;
+  background: white;
   border-radius: 6px;
-  /* allow answer-box to grow and shrink inside .question-view flex container */
+  border: 1px solid var(--border-color);
+  /* output area (white background) */
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   gap: 8px;
-  align-items: flex-start;
   width: 100%;
+  /* take remaining height and become the scroll container */
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  /* keep gutter even when content is short */
+  scrollbar-gutter: stable both-edges;
+}
+
+.answer-box::-webkit-scrollbar {
+  width: 12px;
+}
+.answer-box::-webkit-scrollbar-track {
+  /* make the track visible even when idle */
+  background: rgba(0, 0, 0, 0.06);
+}
+.answer-box::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 10px;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  background-clip: padding-box;
+}
+.answer-box {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(0, 0, 0, 0.28) rgba(0, 0, 0, 0.06);
 }
 .answer-header {
   display: flex;
@@ -335,25 +421,64 @@ function normalizeResponse(s: string) {
   font-weight: 600;
 }
 .answer-content {
-  margin-top: 6px;
   text-align: left;
   overflow-wrap: break-word;
   /* allow content area to take remaining vertical space */
   flex: 1 1 auto;
   min-width: 0; /* allow overflow-wrap to work inside flex */
-  /* spacing for scrollbar/gutter */
-  padding-right: 6px;
 }
 
 /* Make the explanation block itself scrollable when long, and reserve gutter */
 .explanation {
-  white-space: pre-wrap;
+  white-space: normal;
   background: transparent;
   border: none;
   padding: 0;
   display: block;
   text-align: left;
   margin: 0;
+}
+
+.markdown :deep(p) {
+  margin: 0 0 0.6em 0;
+}
+
+.markdown :deep(ul),
+.markdown :deep(ol) {
+  margin: 0.2em 0 0.8em 1.2em;
+  padding: 0;
+}
+
+.markdown :deep(li) {
+  margin: 0.2em 0;
+}
+
+.markdown :deep(code) {
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 0.95em;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.1em 0.25em;
+  border-radius: 4px;
+}
+
+.markdown :deep(pre) {
+  margin: 0.6em 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  overflow: auto;
+}
+
+.markdown :deep(pre code) {
+  background: transparent;
+  padding: 0;
+}
+
+.markdown :deep(a) {
+  color: var(--link-color, #2563eb);
+  text-decoration: underline;
 }
 
 .similar-section {

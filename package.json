@@ -55,6 +55,7 @@
   "module": "dist/src/background/index.js",
   "dependencies": {
     "@github/hotkey": "^3.1.0",
+    "@types/markdown-it": "^14.1.2",
     "async-lock": "^1.4.0",
     "chart.js": "^4.0.1",
     "dayjs": "^1.11.12",
@@ -62,6 +63,7 @@
     "encoding-japanese": "^2.0.0",
     "jimp": "^1.6.0",
     "log4js": "^6.7.0",
+    "markdown-it": "^14.1.0",
     "proper-lockfile": "^4.1.2",
     "semver": "^7.7.1",
     "splitpanes": "^4.0.3",

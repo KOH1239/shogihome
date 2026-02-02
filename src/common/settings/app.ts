@@ -403,7 +403,7 @@ export function defaultAppSettings(opt?: {
     emptyRecordInfoVisibility: true,
     enableHardwareAcceleration: true,
     // Default explain backend and top_k
-    fastapiUrl: "/stream_explain",
+    fastapiUrl: "http://localhost:8081/stream_explain",
     fastapiTopK: 2,
   };
 }

@@ -1,7 +1,8 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { CustomScheme, net } from "electron";
-import { getBundlePath, isDevelopment } from "@/background/proc/env.js";
+import { getBundlePath, isDevelopment, isPreview } from "@/background/proc/env.js";
+import { loadAppSettingsOnce } from "@/background/settings.js";
 import { getAppLogger } from "@/background/log.js";
 import { t } from "@/common/i18n/index.js";
 
@@ -57,8 +58,55 @@ export function handleUserFile(req: Request): Response | Promise<Response> {
   return new Response("not found", { status: 404 });
 }
 
-function validateHTTPRequestMethod(method: string) {
+type AllowedFastAPIRequest = {
+  origin: string;
+  basePath: string;
+};
+
+function getAllowedFastAPIRequest(): AllowedFastAPIRequest | undefined {
+  const fastapiUrl = loadAppSettingsOnce().fastapiUrl;
+  if (!fastapiUrl) return;
+
+  // If it's a relative path (e.g., "/stream_explain"), allow localhost origins
+  if (fastapiUrl.startsWith("/")) {
+    const basePath = fastapiUrl.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || "/";
+    return { origin: "http://localhost", basePath };
+  }
+
+  try {
+    const u = new URL(fastapiUrl);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return;
+    const basePath = u.pathname.replace(/\/+$/, "").replace(/\/[^/]*$/, "") || "/";
+    return { origin: u.origin, basePath };
+  } catch {
+    return;
+  }
+}
+
+function isAllowedFastAPIRequest(url: string): boolean {
+  const allowed = getAllowedFastAPIRequest();
+  if (!allowed) return false;
+  try {
+    const u = new URL(url);
+    // For relative-path config, match any localhost port
+    if (allowed.origin === "http://localhost" && u.hostname === "localhost") {
+      if (allowed.basePath === "/") return true;
+      return u.pathname === allowed.basePath || u.pathname.startsWith(`${allowed.basePath}/`);
+    }
+    // For absolute URL config, match origin exactly
+    if (u.origin !== allowed.origin) return false;
+    if (allowed.basePath === "/") return true;
+    return u.pathname === allowed.basePath || u.pathname.startsWith(`${allowed.basePath}/`);
+  } catch {
+    return false;
+  }
+}
+
+function validateHTTPRequestMethod(method: string, allowFastAPI: boolean) {
   if (method === "GET") {
+    return;
+  }
+  if ((method === "POST" || method === "OPTIONS") && allowFastAPI) {
     return;
   }
   const e = new Error(t.unexpectedHTTPMethodPleaseReport(method));
@@ -72,8 +120,11 @@ const allowedHTTPRequestURLs = [
   { protocol: "devtools:" },
 ];
 
-function validateHTTPRequestURL(url: string) {
-  if (isDevelopment()) {
+function validateHTTPRequestURL(url: string, allowFastAPI: boolean) {
+  if (isDevelopment() || isPreview()) {
+    return;
+  }
+  if (allowFastAPI) {
     return;
   }
   const u = new URL(url);
@@ -91,10 +142,10 @@ export function validateHTTPRequest(method: string, url: string) {
   // In development mode we allow outgoing requests from the renderer
   // (useful for local API backends, dev servers, etc.). In production
   // we enforce stricter checks below.
-  if (isDevelopment()) {
+  if (isDevelopment() || isPreview()) {
     return;
   }
-
-  validateHTTPRequestMethod(method);
-  validateHTTPRequestURL(url);
+  const allowFastAPI = isAllowedFastAPIRequest(url);
+  validateHTTPRequestMethod(method, allowFastAPI);
+  validateHTTPRequestURL(url, allowFastAPI);
 }

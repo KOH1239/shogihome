@@ -28,6 +28,18 @@
             {{ showMore ? "閉じる" : "もっと見る" }}
           </button>
         </div>
+
+        <div v-if="dlshogiMoves.length" class="similar-section">
+          <h5 class="similar-title">dlshogi 読み筋</h5>
+          <ul class="similar-list">
+            <li v-for="(m, idx) in visibleDlshogiMoves" :key="idx" class="similar-item">
+              {{ m }}
+            </li>
+          </ul>
+          <button v-if="dlshogiMoves.length > 5" class="more-btn" @click="toggleShowMoreDlshogi">
+            {{ showMoreDlshogi ? "閉じる" : "もっと見る" }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -41,7 +53,7 @@ import { isNative } from "@/renderer/ipc/api";
 import { useAppSettings } from "@/renderer/store/settings";
 
 defineProps({
-  size: { type: Object as () => Record<string, unknown> | null, required: false, default: null },
+  size: { type: Object as () => object | null, required: false, default: null },
   placeholder: { type: String, default: "局面について質問を入力..." },
   btnLabel: { type: String, default: "送信" },
 });
@@ -51,7 +63,9 @@ const answer = ref("");
 const explanation = ref("");
 const explanationRaw = ref("");
 const similarComments = ref<string[]>([]);
+const dlshogiMoves = ref<string[]>([]);
 const showMore = ref(false);
+const showMoreDlshogi = ref(false);
 const loading = ref(false);
 
 const md = new MarkdownIt({
@@ -83,7 +97,10 @@ const handleSubmit = async () => {
   answer.value = "";
   explanation.value = "";
   similarComments.value = [];
+  dlshogiMoves.value = [];
   explanationRaw.value = "";
+  showMore.value = false;
+  showMoreDlshogi.value = false;
 
   try {
     const store = useStore();
@@ -179,12 +196,22 @@ const handleSubmit = async () => {
                   const rec = obj as Record<string, unknown>;
                   const t = typeof rec.type === "string" ? rec.type : undefined;
                   if (t === "metadata") {
-                    const meta = rec as { similar_comments?: unknown };
+                    const meta = rec as { similar_comments?: unknown; dlshogi_moves?: unknown };
                     if (Array.isArray(meta.similar_comments)) {
                       for (const c of meta.similar_comments) {
                         const s = String(c ?? "");
                         if (!similarComments.value.includes(s) && s !== "") {
                           similarComments.value.push(s);
+                        }
+                      }
+                    }
+
+                    if (Array.isArray(meta.dlshogi_moves)) {
+                      for (const m of meta.dlshogi_moves) {
+                        const s = typeof m === "string" ? m : JSON.stringify(m);
+                        const trimmed = s.trim();
+                        if (trimmed !== "" && !dlshogiMoves.value.includes(trimmed)) {
+                          dlshogiMoves.value.push(trimmed);
                         }
                       }
                     }
@@ -246,6 +273,20 @@ const handleSubmit = async () => {
                 }
               }
             }
+
+            // Merge dlshogi_moves from parsed result into existing array
+            const parsedMoves =
+              (d["dlshogi_moves"] as unknown as unknown[]) ??
+              (d["dlshogiMoves"] as unknown as unknown[]);
+            if (Array.isArray(parsedMoves)) {
+              for (const it of parsedMoves) {
+                const s = typeof it === "string" ? it : JSON.stringify(it);
+                const trimmed = s.trim();
+                if (trimmed !== "" && !dlshogiMoves.value.includes(trimmed)) {
+                  dlshogiMoves.value.push(trimmed);
+                }
+              }
+            }
           }
         } catch {
           // ignore non-JSON final result
@@ -262,6 +303,7 @@ const handleSubmit = async () => {
     if (typeof data === "string") {
       explanation.value = normalizeResponse(data);
       similarComments.value = [];
+      dlshogiMoves.value = [];
     } else if (data && typeof data === "object") {
       const d = data as unknown as { [k: string]: unknown };
       explanation.value = normalizeResponse((d["explanation"] as string) ?? JSON.stringify(d));
@@ -269,6 +311,17 @@ const handleSubmit = async () => {
         (d["similar_comments"] as unknown as string[]) ??
         (d["similarComments"] as unknown as string[]) ??
         [];
+
+      const moves =
+        (d["dlshogi_moves"] as unknown as unknown[]) ??
+        (d["dlshogiMoves"] as unknown as unknown[]) ??
+        [];
+      dlshogiMoves.value = Array.isArray(moves)
+        ? moves
+            .map((m) => (typeof m === "string" ? m : JSON.stringify(m)))
+            .map((s) => s.trim())
+            .filter((s) => s !== "")
+        : [];
     } else {
       // If no structured `data` was produced by non-stream path, but we have
       // accumulated streamed text, show that as the explanation. Otherwise
@@ -301,8 +354,16 @@ const visibleSimilarComments = computed(() =>
   showMore.value ? similarComments.value : similarComments.value.slice(0, 2),
 );
 
+const visibleDlshogiMoves = computed(() =>
+  showMoreDlshogi.value ? dlshogiMoves.value : dlshogiMoves.value.slice(0, 5),
+);
+
 const toggleShowMore = () => {
   showMore.value = !showMore.value;
+};
+
+const toggleShowMoreDlshogi = () => {
+  showMoreDlshogi.value = !showMoreDlshogi.value;
 };
 
 function normalizeResponse(s: string) {

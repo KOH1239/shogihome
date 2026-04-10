@@ -295,6 +295,17 @@ class AppSettingsStore {
     return this.merged.fastapiTopK;
   }
 
+  // AIVIS Speech (Cloud API)
+  get aivisSpeechEnabled(): boolean {
+    return this.merged.aivisSpeechEnabled;
+  }
+  get aivisApiKey(): string | undefined {
+    return this.merged.aivisApiKey;
+  }
+  get aivisModelUuid(): string | undefined {
+    return this.merged.aivisModelUuid;
+  }
+
   async loadAppSettings(): Promise<void> {
     this.settings = await api.loadAppSettings();
     this.merged = this.settings;

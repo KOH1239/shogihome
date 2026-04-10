@@ -9,6 +9,14 @@
         @keyup.enter="handleSubmit"
       />
       <button class="ask-button" @click="handleSubmit">{{ btnLabel }}</button>
+      <button
+        v-if="aivisSpeechEnabled"
+        class="stop-button"
+        :disabled="!ttsBusy"
+        @click="stopSpeech"
+      >
+        停止
+      </button>
     </div>
 
     <div v-if="explanation || answer || loading" class="answer-box">
@@ -34,14 +42,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onBeforeUnmount } from "vue";
 import MarkdownIt from "markdown-it";
 import { useStore } from "@/renderer/store";
 import { isNative } from "@/renderer/ipc/api";
 import { useAppSettings } from "@/renderer/store/settings";
+import { TextSegmenter } from "@/renderer/devices/tts/textSegmenter";
+import { AivisSpeechPlayer } from "@/renderer/devices/tts/aivisSpeechPlayer";
+import { RectSize } from "@/common/assets/geometry.js";
 
 defineProps({
-  size: { type: Object as () => Record<string, unknown> | null, required: false, default: null },
+  size: { type: RectSize, required: true },
   placeholder: { type: String, default: "局面について質問を入力..." },
   btnLabel: { type: String, default: "送信" },
 });
@@ -53,6 +64,23 @@ const explanationRaw = ref("");
 const similarComments = ref<string[]>([]);
 const showMore = ref(false);
 const loading = ref(false);
+
+const appSettings = useAppSettings();
+const aivisSpeechEnabled = computed(() => isNative() && appSettings.aivisSpeechEnabled);
+
+const ttsBusy = ref(false);
+const ttsPlayer = new AivisSpeechPlayer();
+ttsPlayer.setOnStateChange((s) => {
+  ttsBusy.value = s.busy;
+});
+
+const stopSpeech = () => {
+  ttsPlayer.stop();
+};
+
+onBeforeUnmount(() => {
+  ttsPlayer.stop();
+});
 
 const md = new MarkdownIt({
   html: false,
@@ -79,6 +107,30 @@ const handleSubmit = async () => {
   const q = question.value.trim();
   if (!q) return;
 
+  // Stop any ongoing speech immediately on new question.
+  ttsPlayer.stop();
+
+  // Configure speech for this request (non-fatal if missing).
+  if (aivisSpeechEnabled.value) {
+    ttsPlayer.configure({
+      apiKey: appSettings.aivisApiKey,
+      modelUuid: appSettings.aivisModelUuid,
+    });
+  }
+  const ttsSegmenter = new TextSegmenter();
+  const enqueueTTS = (delta: string) => {
+    if (!aivisSpeechEnabled.value) return;
+    for (const seg of ttsSegmenter.push(delta)) {
+      ttsPlayer.enqueue(seg);
+    }
+  };
+  const flushTTS = () => {
+    if (!aivisSpeechEnabled.value) return;
+    for (const seg of ttsSegmenter.flush()) {
+      ttsPlayer.enqueue(seg);
+    }
+  };
+
   loading.value = true;
   answer.value = "";
   explanation.value = "";
@@ -88,7 +140,6 @@ const handleSubmit = async () => {
   try {
     const store = useStore();
     const sfen = store.record?.position?.sfen ?? store.record?.sfen ?? "";
-    const appSettings = useAppSettings();
     let fastapiUrl = appSettings.fastapiUrl || "/stream_explain";
 
     // Browser dev mode: if user set absolute localhost URL, convert to a relative path
@@ -191,17 +242,21 @@ const handleSubmit = async () => {
                     // do not append metadata to explanation stream
                   } else if (typeof rec.explanation === "string") {
                     explanationRaw.value += rec.explanation;
+                    enqueueTTS(rec.explanation);
                   } else if (typeof rec.content === "string") {
                     explanationRaw.value += rec.content;
+                    enqueueTTS(rec.content);
                   } else {
                     explanationRaw.value += JSON.stringify(rec);
                   }
                 } else {
                   explanationRaw.value += String(line);
+                  enqueueTTS(String(line) + "\n");
                 }
               } catch {
                 // not JSON - append raw
                 explanationRaw.value += line;
+                enqueueTTS(line + "\n");
               }
               // update normalized explanation for UI
               explanation.value = normalizeResponse(explanationRaw.value);
@@ -215,17 +270,26 @@ const handleSubmit = async () => {
             try {
               const obj = JSON.parse(rem);
               if (obj && typeof obj === "object") {
-                if (obj.explanation) explanationRaw.value += String(obj.explanation);
-                else explanationRaw.value += JSON.stringify(obj);
+                if (obj.explanation) {
+                  const d = String(obj.explanation);
+                  explanationRaw.value += d;
+                  enqueueTTS(d);
+                } else {
+                  explanationRaw.value += JSON.stringify(obj);
+                }
               } else {
                 explanationRaw.value += rem;
+                enqueueTTS(rem + "\n");
               }
             } catch {
               explanationRaw.value += rem;
+              enqueueTTS(rem + "\n");
             }
             explanation.value = normalizeResponse(explanationRaw.value);
           }
         }
+
+        flushTTS();
         // After streaming completes, try to parse final content as structured JSON if possible
         try {
           const parsed = JSON.parse(explanationRaw.value);
@@ -262,13 +326,20 @@ const handleSubmit = async () => {
     if (typeof data === "string") {
       explanation.value = normalizeResponse(data);
       similarComments.value = [];
+
+      enqueueTTS(data);
+      flushTTS();
     } else if (data && typeof data === "object") {
       const d = data as unknown as { [k: string]: unknown };
-      explanation.value = normalizeResponse((d["explanation"] as string) ?? JSON.stringify(d));
+      const exp = (d["explanation"] as string) ?? JSON.stringify(d);
+      explanation.value = normalizeResponse(exp);
       similarComments.value =
         (d["similar_comments"] as unknown as string[]) ??
         (d["similarComments"] as unknown as string[]) ??
         [];
+
+      enqueueTTS(exp);
+      flushTTS();
     } else {
       // If no structured `data` was produced by non-stream path, but we have
       // accumulated streamed text, show that as the explanation. Otherwise
@@ -372,6 +443,19 @@ function buildExplainURL(fastapiUrl: string, params: URLSearchParams) {
   background: var(--main-color);
   color: var(--main-bg-color);
   cursor: pointer;
+}
+
+.stop-button {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  cursor: pointer;
+}
+
+.stop-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .answer-box {
   margin-top: 8px;

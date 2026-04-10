@@ -651,6 +651,25 @@
           <div class="form-item-label-wide">FastAPI top_k</div>
           <input v-model.number="update.fastapiTopK" type="number" min="1" max="20" />
         </div>
+
+        <!-- AIVIS Speech (Cloud API) -->
+        <div class="form-item">
+          <div class="form-item-label-wide">AIVIS Speech</div>
+          <ToggleButton v-model:value="update.aivisSpeechEnabled" />
+        </div>
+        <div class="form-item">
+          <div class="form-item-label-wide">AIVIS API Key</div>
+          <input
+            v-model="update.aivisApiKey"
+            type="password"
+            class="long-text"
+            autocomplete="off"
+          />
+        </div>
+        <div class="form-item">
+          <div class="form-item-label-wide">AIVIS model_uuid</div>
+          <input v-model="update.aivisModelUuid" type="text" class="long-text" />
+        </div>
       </div>
       <hr v-if="!isMobileWebApp()" />
       <!-- アプリバージョン -->
@@ -830,6 +849,10 @@ const update = ref({
   // FastAPI / LLM explain
   fastapiUrl: org.fastapiUrl,
   fastapiTopK: org.fastapiTopK ?? 2,
+  // AIVIS Speech
+  aivisSpeechEnabled: org.aivisSpeechEnabled,
+  aivisApiKey: org.aivisApiKey,
+  aivisModelUuid: org.aivisModelUuid,
   clockSoundTarget: org.clockSoundTarget,
   recordShortcutKeys: org.recordShortcutKeys,
   defaultRecordFileFormat: org.defaultRecordFileFormat,
@@ -874,6 +897,9 @@ function reverseFormat(source: AppSettingsUpdate): AppSettingsUpdate {
     clockPitch: Math.max(220, Math.min(880, source.clockPitch!)),
     fastapiUrl: source.fastapiUrl,
     fastapiTopK: source.fastapiTopK,
+    aivisSpeechEnabled: !!source.aivisSpeechEnabled,
+    aivisApiKey: source.aivisApiKey,
+    aivisModelUuid: source.aivisModelUuid,
   };
 }
 

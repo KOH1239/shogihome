@@ -267,6 +267,11 @@ export type AppSettings = {
   // FastAPI / LLM explain endpoint
   fastapiUrl?: string;
   fastapiTopK?: number;
+
+  // AIVIS Speech (Cloud API)
+  aivisSpeechEnabled: boolean;
+  aivisApiKey?: string;
+  aivisModelUuid?: string;
 };
 
 export function isLogEnabled(type: LogType, appSettings: AppSettings): boolean {
@@ -405,6 +410,9 @@ export function defaultAppSettings(opt?: {
     // Default explain backend and top_k
     fastapiUrl: "http://localhost:8081/stream_explain",
     fastapiTopK: 2,
+
+    // Default AIVIS Speech settings
+    aivisSpeechEnabled: false,
   };
 }
 

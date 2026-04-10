@@ -392,6 +392,9 @@ const bridge: Bridge = {
   onProgress(): void {
     // Do Nothing
   },
+  async fetchLLMExplain(): Promise<{ status: number; body: string }> {
+    throw new Error("This feature is not available on command line tool");
+  },
 };
 
 global.window = {

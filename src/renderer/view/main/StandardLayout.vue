@@ -93,13 +93,12 @@
               <TabPane
                 class="shadow-bottom margin-bottom"
                 :size="tabPaneSize2a"
-                :visible-tabs="[Tab.CHART, Tab.PERCENTAGE_CHART]"
+                :visible-tabs="[Tab.COMMENT, Tab.CHART, Tab.PERCENTAGE_CHART, Tab.QUESTION]"
                 :active-tab="appSettings.tab2"
                 :display-minimize-toggle="true"
                 @on-change-tab="onChangeTab2"
                 @on-minimize="onMinimizeTab"
               />
-              <RecordComment class="full" />
             </div>
           </Pane>
         </Splitpanes>

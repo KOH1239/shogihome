@@ -405,6 +405,11 @@ const api: Bridge = {
       callback(progress);
     });
   },
+  async fetchLLMExplain(
+    payload: Record<string, unknown>,
+  ): Promise<{ status: number; body: string }> {
+    return await ipcRenderer.invoke(Background.FETCH_LLM_EXPLAIN, payload);
+  },
 };
 
 contextBridge.exposeInMainWorld("electronShogiAPI", api);

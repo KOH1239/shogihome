@@ -146,4 +146,5 @@ export interface Bridge {
   sendTestNotification(): void;
   getPathForFile(file: File): string;
   onProgress(callback: (progress: number) => void): void;
+  fetchLLMExplain(payload: Record<string, unknown>): Promise<{ status: number; body: string }>;
 }

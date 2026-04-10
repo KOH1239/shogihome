@@ -85,6 +85,7 @@ export enum Background {
   OPEN_LOG_FILE = "openLogFile",
   LOG = "log",
   ON_CLOSABLE = "onClosable",
+  FETCH_LLM_EXPLAIN = "fetchLLMExplain",
 }
 
 export enum Renderer {

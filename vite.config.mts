@@ -38,10 +38,16 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // "/stream_explain": {
+      //   target: "http://localhost:8081",
+      //   changeOrigin: true,
+      //   secure: false,
+      // },
       "/stream_explain": {
-        target: "http://localhost:8081",
+        target: "https://246bae6cd0c5.ngrok-free.app/",
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/stream_explain/, "/stream_explain"),
       },
       // Optional: forward API namespace
       "/api": {

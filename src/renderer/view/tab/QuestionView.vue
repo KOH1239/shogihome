@@ -29,6 +29,14 @@
             {{ showMore ? "閉じる" : "もっと見る" }}
           </button>
         </div>
+        <div v-if="dlshogiMoves.length" class="move-section">
+          <h5 class="move-title">dlshogiの読み筋</h5>
+          <ul class="move-list">
+            <li v-for="(move, index) in dlshogiMoves" :key="index">
+              {{ move }}
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
@@ -50,6 +58,7 @@ const answer = ref("");
 const explanation = ref("");
 const explanationRaw = ref("");
 const similarComments = ref<string[]>([]);
+const dlshogiMoves = ref<string[]>([]);
 const showMore = ref(false);
 const loading = ref(false);
 
@@ -61,6 +70,7 @@ const handleSubmit = async () => {
   answer.value = "";
   explanation.value = "";
   similarComments.value = [];
+  dlshogiMoves.value = [];
   explanationRaw.value = "";
 
   try {
@@ -69,11 +79,33 @@ const handleSubmit = async () => {
     const appSettings = useAppSettings();
     const fastapiUrl = appSettings.fastapiUrl || "/stream_explain";
     const topK = appSettings.fastapiTopK ?? 2;
-    const resp = await fetch(fastapiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_input: q, sfen, top_k: topK }),
-    });
+
+    // If running inside Electron (preview/build), use IPC bridge to avoid CORS issues.
+    // The preload exposes `electronShogiAPI.fetchLLMExplain` when available.
+    // It returns { status, body } where body is text.
+    let resp: Response | null = null;
+    let ipcResult: { status: number; body: string } | null = null;
+    // @ts-ignore - electronShogiAPI injected in preload
+    if (typeof window !== "undefined" && (window as any).electronShogiAPI?.fetchLLMExplain) {
+      // Use background fetch via IPC
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ipcResult = await (window as any).electronShogiAPI.fetchLLMExplain({
+        user_input: q,
+        sfen,
+        top_k: topK,
+      });
+      // Create a fake Response-like object for downstream processing when non-streaming
+      resp = new Response(ipcResult.body, {
+        status: ipcResult.status,
+        headers: { "content-type": "application/json" },
+      });
+    } else {
+      resp = await fetch(fastapiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_input: q, sfen, top_k: topK }),
+      });
+    }
 
     let data: unknown;
 
@@ -136,12 +168,22 @@ const handleSubmit = async () => {
                   const rec = obj as Record<string, unknown>;
                   const t = typeof rec.type === "string" ? rec.type : undefined;
                   if (t === "metadata") {
-                    const meta = rec as { similar_comments?: unknown };
+                    const meta = rec as { similar_comments?: unknown; dlshogi_moves?: unknown };
                     if (Array.isArray(meta.similar_comments)) {
                       for (const c of meta.similar_comments) {
                         const s = String(c ?? "");
                         if (!similarComments.value.includes(s) && s !== "") {
                           similarComments.value.push(s);
+                        }
+                      }
+                    }
+                    if (Array.isArray(meta.dlshogi_moves)) {
+                      for (const move of meta.dlshogi_moves) {
+                        const m = String(move ?? "")
+                          .replace(/^dlshogiの読み筋[::]?\s*/, "")
+                          .trim();
+                        if (!dlshogiMoves.value.includes(m) && m !== "") {
+                          dlshogiMoves.value.push(m);
                         }
                       }
                     }
@@ -203,6 +245,19 @@ const handleSubmit = async () => {
                 }
               }
             }
+            const parsedMoves =
+              (d["dlshogi_moves"] as unknown as string[]) ??
+              (d["dlshogiMoves"] as unknown as string[]);
+            if (Array.isArray(parsedMoves)) {
+              for (const it of parsedMoves) {
+                const m = String(it ?? "")
+                  .replace(/^dlshogiの読み筋[::]?\s*/, "")
+                  .trim();
+                if (m !== "" && !dlshogiMoves.value.includes(m)) {
+                  dlshogiMoves.value.push(m);
+                }
+              }
+            }
           }
         } catch {
           // ignore non-JSON final result
@@ -225,6 +280,10 @@ const handleSubmit = async () => {
       similarComments.value =
         (d["similar_comments"] as unknown as string[]) ??
         (d["similarComments"] as unknown as string[]) ??
+        [];
+      dlshogiMoves.value =
+        (d["dlshogi_moves"] as unknown as string[]) ??
+        (d["dlshogiMoves"] as unknown as string[]) ??
         [];
     } else {
       // If no structured `data` was produced by non-stream path, but we have
@@ -284,7 +343,7 @@ function normalizeResponse(s: string) {
   min-height: 0; /* allow children to shrink inside flex container */
   box-sizing: border-box;
   /* make the tab occupy the viewport so overflow can actually happen */
-  height: 35vh;
+  height: 50vh;
   /* always show vertical scrollbar for the tab and make it scrollable */
   overflow-y: scroll;
   overflow-x: hidden;
@@ -365,6 +424,13 @@ function normalizeResponse(s: string) {
 }
 .similar-item {
   margin-bottom: 4px;
+}
+.move-section {
+  margin-top: 8px;
+}
+.move-list {
+  padding-left: 16px;
+  margin: 6px 0;
 }
 .status {
   color: var(--muted-color);

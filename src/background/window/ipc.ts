@@ -398,6 +398,51 @@ ipcMain.handle(Background.LOAD_REMOTE_TEXT_FILE, async (event, url: string) => {
   return await fetch(url);
 });
 
+ipcMain.handle(Background.FETCH_LLM_EXPLAIN, async (event, payload: Record<string, unknown>) => {
+  validateIPCSender(event.senderFrame);
+  const appSettings = await loadAppSettings();
+  let fastapiUrl = appSettings.fastapiUrl || "/stream_explain";
+  // If configured URL is relative, assume localhost:8081 (dev backend)
+  if (!/^https?:\/\//i.test(fastapiUrl)) {
+    const prefix = fastapiUrl.startsWith("/") ? "" : "/";
+    fastapiUrl = `http://localhost:8081${prefix}${fastapiUrl}`;
+  }
+
+  // perform POST and return { status, body }
+  return new Promise(async (resolve, reject) => {
+    try {
+      const u = new URL(fastapiUrl);
+      const isHttps = u.protocol === "https:";
+      const httpMod = isHttps ? await import("node:https") : await import("node:http");
+      const data = JSON.stringify(payload);
+      const options: any = {
+        hostname: u.hostname,
+        port: u.port || (isHttps ? 443 : 80),
+        path: u.pathname + (u.search || ""),
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(data),
+        },
+        timeout: 20000,
+      };
+      const req = httpMod.request(options, (res: any) => {
+        const bufs: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => bufs.push(chunk));
+        res.on("end", () => {
+          const body = Buffer.concat(bufs).toString("utf8");
+          resolve({ status: res.statusCode, body });
+        });
+      });
+      req.on("error", (e: Error) => reject(e));
+      req.write(data);
+      req.end();
+    } catch (e) {
+      reject(e);
+    }
+  });
+});
+
 ipcMain.handle(
   Background.CROP_PIECE_IMAGE,
   async (event, srcURL: string, deleteMargin: boolean): Promise<string> => {

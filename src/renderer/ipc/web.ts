@@ -236,6 +236,9 @@ export const webAPI: Bridge = {
   async loadRemoteTextFile(): Promise<string> {
     throw new Error(t.thisFeatureNotAvailableOnWebApp);
   },
+  async fetchLLMExplain(): Promise<{ status: number; body: string }> {
+    throw new Error(t.thisFeatureNotAvailableOnWebApp);
+  },
   async convertRecordFiles(): Promise<string> {
     throw new Error(t.thisFeatureNotAvailableOnWebApp);
   },

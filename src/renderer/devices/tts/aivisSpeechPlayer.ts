@@ -1,3 +1,5 @@
+import { bridge } from "@/renderer/ipc/api";
+
 type AivisSpeechConfig = {
   apiKey?: string;
   modelUuid?: string;
@@ -78,8 +80,8 @@ export class AivisSpeechPlayer {
       return;
     }
 
-    const { apiKey, modelUuid } = this.config;
-    if (!apiKey || !modelUuid) {
+    const { modelUuid } = this.config;
+    if (!modelUuid) {
       // Not configured; do nothing.
       this.queue = [];
       this.emitState();
@@ -113,8 +115,8 @@ export class AivisSpeechPlayer {
   }
 
   private async playSegmentStreaming(text: string): Promise<void> {
-    const { apiKey, modelUuid } = this.config;
-    if (!apiKey || !modelUuid) return;
+    const { modelUuid } = this.config;
+    if (!modelUuid) return;
 
     // Abort any previous in-flight fetch.
     if (this.abortController) {
@@ -123,36 +125,15 @@ export class AivisSpeechPlayer {
     const controller = new AbortController();
     this.abortController = controller;
 
-    const res = await fetch("https://api.aivis-project.com/v1/tts/synthesize", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model_uuid: modelUuid,
-        text,
-        language: "ja",
-        use_ssml: false,
-        use_volume_normalizer: true,
-        output_format: "mp3",
-        leading_silence_seconds: 0.0,
-        trailing_silence_seconds: 0.1,
-      }),
-      signal: controller.signal,
-    });
-
-    if (!res.ok) {
-      // Non-fatal: stop TTS for this segment.
-      throw new Error(`AIVIS TTS error: HTTP ${res.status}`);
-    }
-    const arrayBuffer = await res.arrayBuffer();
+    const audioBytes = await bridge.aivisSynthesize(text, modelUuid);
 
     if (controller.signal.aborted) {
       throw new DOMException("Aborted", "AbortError");
     }
 
-    const blob = new Blob([arrayBuffer], { type: "audio/mpeg" });
+    const wavBuffer = new Uint8Array(audioBytes.byteLength);
+    wavBuffer.set(audioBytes);
+    const blob = new Blob([wavBuffer.buffer], { type: "audio/wav" });
     const objectURL = URL.createObjectURL(blob);
     this.currentObjectURL = objectURL;
 

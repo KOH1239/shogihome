@@ -399,6 +399,43 @@ ipcMain.handle(Background.LOAD_REMOTE_TEXT_FILE, async (event, url: string) => {
 });
 
 ipcMain.handle(
+  Background.AIVIS_SYNTHESIZE,
+  async (event, text: string, speaker: string): Promise<Uint8Array> => {
+    validateIPCSender(event.senderFrame);
+    const baseURL = "http://localhost:10101";
+
+    const audioQueryURL = new URL("/audio_query", baseURL);
+    audioQueryURL.searchParams.set("speaker", speaker);
+    audioQueryURL.searchParams.set("text", text);
+
+    const audioQueryRes = await globalThis.fetch(audioQueryURL.toString(), {
+      method: "POST",
+    });
+    if (!audioQueryRes.ok) {
+      const detail = await audioQueryRes.text().catch(() => "");
+      throw new Error(`AIVIS /audio_query failed: HTTP ${audioQueryRes.status} ${detail}`.trim());
+    }
+
+    const audioQuery = await audioQueryRes.json();
+
+    const synthesisURL = new URL("/synthesis", baseURL);
+    synthesisURL.searchParams.set("speaker", speaker);
+    const synthesisRes = await globalThis.fetch(synthesisURL.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(audioQuery),
+    });
+    if (!synthesisRes.ok) {
+      const detail = await synthesisRes.text().catch(() => "");
+      throw new Error(`AIVIS /synthesis failed: HTTP ${synthesisRes.status} ${detail}`.trim());
+    }
+
+    const arrayBuffer = await synthesisRes.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
+  },
+);
+
+ipcMain.handle(
   Background.CROP_PIECE_IMAGE,
   async (event, srcURL: string, deleteMargin: boolean): Promise<string> => {
     validateIPCSender(event.senderFrame);

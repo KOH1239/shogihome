@@ -233,6 +233,9 @@ export const webAPI: Bridge = {
   async loadRecordFileBackup(): Promise<string> {
     throw new Error(t.thisFeatureNotAvailableOnWebApp);
   },
+  async aivisSynthesize(): Promise<Uint8Array> {
+    throw new Error(t.thisFeatureNotAvailableOnWebApp);
+  },
   async loadRemoteTextFile(): Promise<string> {
     throw new Error(t.thisFeatureNotAvailableOnWebApp);
   },

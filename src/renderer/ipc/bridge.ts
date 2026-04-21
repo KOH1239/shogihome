@@ -49,6 +49,7 @@ export interface Bridge {
   clearRecordFileHistory(): Promise<void>;
   saveRecordFileBackup(kif: string): Promise<void>;
   loadRecordFileBackup(name: string): Promise<string>;
+  aivisSynthesize(text: string, speaker: string): Promise<Uint8Array>;
   loadRemoteTextFile(url: string): Promise<string>;
   convertRecordFiles(json: string): Promise<string>;
   showSelectSFENDialog(lastPath: string): Promise<string>;

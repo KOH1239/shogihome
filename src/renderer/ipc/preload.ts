@@ -142,6 +142,9 @@ const api: Bridge = {
   async loadRecordFileBackup(name: string): Promise<string> {
     return await ipcRenderer.invoke(Background.LOAD_RECORD_FILE_BACKUP, name);
   },
+  async aivisSynthesize(text: string, speaker: string): Promise<Uint8Array> {
+    return await ipcRenderer.invoke(Background.AIVIS_SYNTHESIZE, text, speaker);
+  },
   onOpenRecord(callback: (path: string) => void): void {
     ipcRenderer.on(Renderer.OPEN_RECORD, (_, path) => callback(path));
   },

@@ -37,6 +37,7 @@ export enum Background {
   CLEAR_RECORD_FILE_HISTORY = "clearRecordFileHistory",
   SAVE_RECORD_FILE_BACKUP = "saveRecordFileBackup",
   LOAD_RECORD_FILE_BACKUP = "loadRecordFileBackup",
+  AIVIS_SYNTHESIZE = "aivisSynthesize",
   SHOW_OPEN_BOOK_DIALOG = "showOpenBookDialog",
   SHOW_SAVE_BOOK_DIALOG = "showSaveBookDialog",
   CLEAR_BOOK = "clearBook",

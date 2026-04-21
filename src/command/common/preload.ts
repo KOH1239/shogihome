@@ -146,6 +146,9 @@ const bridge: Bridge = {
   async loadRecordFileBackup(): Promise<string> {
     throw new Error("This feature is not available on command line tool");
   },
+  async aivisSynthesize(): Promise<Uint8Array> {
+    throw new Error("This feature is not available on command line tool");
+  },
   async loadRemoteTextFile(): Promise<string> {
     throw new Error("This feature is not available on command line tool");
   },

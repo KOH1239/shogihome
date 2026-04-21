@@ -20,6 +20,10 @@ export class AivisSpeechPlayer {
     this.onStateChange = cb;
   }
 
+  primePlayback(): void {
+    // Kept for user-gesture timing; HTMLAudioElement playback itself is started later.
+  }
+
   get busy(): boolean {
     return this.processing || this.queue.length > 0;
   }
@@ -45,13 +49,12 @@ export class AivisSpeechPlayer {
         // ignore
       }
       try {
-        // Detach source to release resources.
         this.currentAudio.src = "";
       } catch {
         // ignore
       }
+      this.currentAudio = null;
     }
-    this.currentAudio = null;
 
     if (this.currentObjectURL) {
       try {
@@ -143,119 +146,72 @@ export class AivisSpeechPlayer {
       // Non-fatal: stop TTS for this segment.
       throw new Error(`AIVIS TTS error: HTTP ${res.status}`);
     }
-    if (!res.body) {
-      throw new Error("AIVIS TTS error: no response body");
+    const arrayBuffer = await res.arrayBuffer();
+
+    if (controller.signal.aborted) {
+      throw new DOMException("Aborted", "AbortError");
     }
 
-    const MediaSourceCtor = (self as unknown as { MediaSource?: typeof MediaSource }).MediaSource;
-    if (!MediaSourceCtor) {
-      throw new Error("AIVIS TTS error: MediaSource is not available");
-    }
-
-    const mediaSource = new MediaSourceCtor();
-    const objectURL = URL.createObjectURL(mediaSource);
+    const blob = new Blob([arrayBuffer], { type: "audio/mpeg" });
+    const objectURL = URL.createObjectURL(blob);
     this.currentObjectURL = objectURL;
 
     const audio = new Audio(objectURL);
-    // Electron doesn't need remote playback; keep it consistent with AIVIS demo.
+    audio.preload = "auto";
     (audio as unknown as { disableRemotePlayback?: boolean }).disableRemotePlayback = true;
     this.currentAudio = audio;
 
-    // Try starting playback early.
-    try {
-      await audio.play();
-    } catch (e) {
-      // Autoplay restrictions or audio device issues.
-      throw new Error(`AIVIS TTS error: audio.play failed: ${String(e)}`);
-    }
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        try {
+          audio.pause();
+        } catch {
+          // ignore
+        }
+        reject(new DOMException("Aborted", "AbortError"));
+      };
 
-    const sourceBuffer = await new Promise<SourceBuffer>((resolve, reject) => {
-      const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
-      if (controller.signal.aborted) return onAbort();
+      if (controller.signal.aborted) {
+        onAbort();
+        return;
+      }
       controller.signal.addEventListener("abort", onAbort, { once: true });
 
-      mediaSource.addEventListener(
-        "sourceopen",
+      audio.addEventListener(
+        "ended",
         () => {
-          try {
-            const sb = mediaSource.addSourceBuffer("audio/mpeg");
-            resolve(sb);
-          } catch (err) {
-            reject(err);
+          if (this.currentAudio === audio) {
+            this.currentAudio = null;
           }
+          if (this.currentObjectURL === objectURL) {
+            URL.revokeObjectURL(objectURL);
+            this.currentObjectURL = null;
+          }
+          resolve();
         },
         { once: true },
       );
-    });
-
-    const waitForIdle = () =>
-      sourceBuffer.updating
-        ? new Promise<void>((r) =>
-            sourceBuffer.addEventListener("updateend", () => r(), { once: true }),
-          )
-        : Promise.resolve();
-
-    const waitForIdleCompletely = async () => {
-      while (sourceBuffer.updating) {
-        await waitForIdle();
-        await new Promise((r) => setTimeout(r, 0));
-      }
-    };
-
-    const reader = res.body.getReader();
-    try {
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) {
-          await waitForIdleCompletely();
-          try {
-            mediaSource.endOfStream();
-          } catch (error: unknown) {
-            const name = (error as { name?: string })?.name;
-            if (name === "InvalidStateError" && sourceBuffer.updating) {
-              await waitForIdleCompletely();
-              mediaSource.endOfStream();
-            } else {
-              throw error;
-            }
-          }
-          break;
-        }
-        if (!value) continue;
-        await waitForIdle();
-        await new Promise((r) => setTimeout(r, 0));
-        sourceBuffer.appendBuffer(value);
-      }
-    } finally {
-      try {
-        reader.releaseLock();
-      } catch {
-        // ignore
-      }
-    }
-
-    await new Promise<void>((resolve, reject) => {
-      const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
-      if (controller.signal.aborted) return onAbort();
-      controller.signal.addEventListener("abort", onAbort, { once: true });
-
-      if (audio.ended) {
-        resolve();
-        return;
-      }
-      audio.addEventListener("ended", () => resolve(), { once: true });
       audio.addEventListener(
         "error",
         () => reject(new Error("AIVIS TTS error: audio element error")),
         { once: true },
       );
+
+      try {
+        void audio.play().catch((error) => {
+          reject(new Error(`AIVIS TTS error: audio.play failed: ${String(error)}`));
+        });
+      } catch (error) {
+        reject(new Error(`AIVIS TTS error: audio.play failed: ${String(error)}`));
+      }
     });
 
-    // Cleanup per-segment.
-    if (this.currentObjectURL) {
-      URL.revokeObjectURL(this.currentObjectURL);
+    if (this.currentAudio === audio) {
+      this.currentAudio = null;
+    }
+    if (this.currentObjectURL === objectURL) {
+      URL.revokeObjectURL(objectURL);
       this.currentObjectURL = null;
     }
-    this.currentAudio = null;
   }
 }

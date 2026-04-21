@@ -116,6 +116,7 @@ const handleSubmit = async () => {
       apiKey: appSettings.aivisApiKey,
       modelUuid: appSettings.aivisModelUuid,
     });
+    ttsPlayer.primePlayback();
   }
   const ttsSegmenter = new TextSegmenter();
   const enqueueTTS = (delta: string) => {

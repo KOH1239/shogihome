@@ -270,6 +270,7 @@ export type AppSettings = {
 
   // AIVIS Speech (Cloud API)
   aivisSpeechEnabled: boolean;
+  aivisBaseUrl?: string;
   aivisApiKey?: string;
   aivisModelUuid?: string;
 };
@@ -413,6 +414,7 @@ export function defaultAppSettings(opt?: {
 
     // Default AIVIS Speech settings
     aivisSpeechEnabled: false,
+    aivisBaseUrl: "http://localhost:10101",
   };
 }
 

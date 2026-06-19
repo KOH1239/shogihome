@@ -658,6 +658,10 @@
           <ToggleButton v-model:value="update.aivisSpeechEnabled" />
         </div>
         <div class="form-item">
+          <div class="form-item-label-wide">AIVIS base URL</div>
+          <input v-model="update.aivisBaseUrl" type="text" class="long-text" />
+        </div>
+        <div class="form-item">
           <div class="form-item-label-wide">AIVIS API Key</div>
           <input
             v-model="update.aivisApiKey"
@@ -851,6 +855,7 @@ const update = ref({
   fastapiTopK: org.fastapiTopK ?? 2,
   // AIVIS Speech
   aivisSpeechEnabled: org.aivisSpeechEnabled,
+  aivisBaseUrl: org.aivisBaseUrl,
   aivisApiKey: org.aivisApiKey,
   aivisModelUuid: org.aivisModelUuid,
   clockSoundTarget: org.clockSoundTarget,
@@ -898,6 +903,7 @@ function reverseFormat(source: AppSettingsUpdate): AppSettingsUpdate {
     fastapiUrl: source.fastapiUrl,
     fastapiTopK: source.fastapiTopK,
     aivisSpeechEnabled: !!source.aivisSpeechEnabled,
+    aivisBaseUrl: source.aivisBaseUrl,
     aivisApiKey: source.aivisApiKey,
     aivisModelUuid: source.aivisModelUuid,
   };

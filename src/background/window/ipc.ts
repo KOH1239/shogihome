@@ -402,7 +402,8 @@ ipcMain.handle(
   Background.AIVIS_SYNTHESIZE,
   async (event, text: string, speaker: string): Promise<Uint8Array> => {
     validateIPCSender(event.senderFrame);
-    const baseURL = "http://localhost:10101";
+    const appSettings = await loadAppSettings();
+    const baseURL = appSettings.aivisBaseUrl || "http://localhost:10101";
 
     const audioQueryURL = new URL("/audio_query", baseURL);
     audioQueryURL.searchParams.set("speaker", speaker);

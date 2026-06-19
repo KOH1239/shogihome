@@ -299,6 +299,9 @@ class AppSettingsStore {
   get aivisSpeechEnabled(): boolean {
     return this.merged.aivisSpeechEnabled;
   }
+  get aivisBaseUrl(): string | undefined {
+    return this.merged.aivisBaseUrl;
+  }
   get aivisApiKey(): string | undefined {
     return this.merged.aivisApiKey;
   }

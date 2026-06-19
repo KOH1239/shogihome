@@ -50,6 +50,7 @@ import { useAppSettings } from "@/renderer/store/settings";
 import { TextSegmenter } from "@/renderer/devices/tts/textSegmenter";
 import { AivisSpeechPlayer } from "@/renderer/devices/tts/aivisSpeechPlayer";
 import { RectSize } from "@/common/assets/geometry.js";
+import { formatRecentMoves } from "@/renderer/helpers/recentMoves";
 
 defineProps({
   size: { type: RectSize, required: true },
@@ -141,6 +142,7 @@ const handleSubmit = async () => {
   try {
     const store = useStore();
     const sfen = store.record?.position?.sfen ?? store.record?.sfen ?? "";
+    const recentMoves = store.record ? formatRecentMoves(store.record) : "";
     let fastapiUrl = appSettings.fastapiUrl || "/stream_explain";
 
     // Browser dev mode: if user set absolute localhost URL, convert to a relative path
@@ -167,7 +169,7 @@ const handleSubmit = async () => {
     const resp = await fetch(fastapiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_input: q, sfen, top_k: topK }),
+      body: JSON.stringify({ user_input: q, sfen, recent_moves: recentMoves, top_k: topK }),
     });
 
     let data: unknown;
@@ -175,7 +177,7 @@ const handleSubmit = async () => {
     if (!resp.ok) {
       const txt = await resp.text();
       if (resp.status === 405 || /予期せぬHTTPメソッド/.test(txt)) {
-        const params = new URLSearchParams({ user_input: q, sfen });
+        const params = new URLSearchParams({ user_input: q, sfen, recent_moves: recentMoves });
         const getResp = await fetch(buildExplainURL(fastapiUrl, params));
         if (getResp.ok) {
           try {
